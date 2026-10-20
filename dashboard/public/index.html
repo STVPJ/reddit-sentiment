@@ -1,0 +1,2470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sentiment Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-annotation/3.1.0/chartjs-plugin-annotation.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      line-height: 1.5;
+    }
+
+    /* Header */
+    .header {
+      background: #1e293b;
+      color: #fff;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .header h1 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+    .stats-bar {
+      display: flex;
+      gap: 20px;
+      font-size: 0.8rem;
+      color: #94a3b8;
+    }
+    .stats-bar span { white-space: nowrap; }
+    .stats-bar strong { color: #e2e8f0; }
+
+    /* Layout */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    /* Controls bar */
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .controls label {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: #64748b;
+    }
+
+    /* Buttons */
+    .btn-group {
+      display: flex;
+      gap: 0;
+    }
+    .btn-group button {
+      padding: 6px 14px;
+      font-size: 0.8rem;
+      border: 1px solid #334155;
+      background: transparent;
+      color: #94a3b8;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-group button:first-child { border-radius: 6px 0 0 6px; }
+    .btn-group button:last-child { border-radius: 0 6px 6px 0; }
+    .btn-group button:not(:first-child) { border-left: none; }
+    .btn-group button.active {
+      background: #3b82f6;
+      color: #fff;
+      border-color: #3b82f6;
+    }
+    .btn-group button:hover:not(.active) { background: #334155; }
+
+    .btn {
+      padding: 6px 14px;
+      font-size: 0.8rem;
+      border: 1px solid #334155;
+      background: transparent;
+      color: #94a3b8;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn:hover { background: #334155; }
+    .btn.active {
+      background: #3b82f6;
+      color: #fff;
+      border-color: #3b82f6;
+    }
+
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      font-size: 0.85rem;
+      color: #94a3b8;
+      background: transparent;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-bottom: 16px;
+      transition: all 0.15s;
+    }
+    .back-btn:hover { background: #334155; }
+
+    /* Card grid */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    @media (max-width: 900px) {
+      .card-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 580px) {
+      .card-grid { grid-template-columns: 1fr; }
+    }
+
+    /* Competitor card */
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 16px;
+      cursor: pointer;
+      transition: box-shadow 0.2s, transform 0.1s;
+    }
+    .card:hover {
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      transform: translateY(-1px);
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 12px;
+    }
+    .card-header h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #f1f5f9;
+    }
+    .card-header .header-right {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+    .card-header .agg-score {
+      font-size: 1.1rem;
+      font-weight: 700;
+      font-family: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, monospace;
+    }
+    .card-header .post-count {
+      font-size: 0.75rem;
+      color: #94a3b8;
+      background: #334155;
+      padding: 2px 8px;
+      border-radius: 12px;
+    }
+
+    .demo-banner {
+      background: #f59e0b;
+      color: #1e293b;
+      font-weight: 700;
+      font-size: 0.8rem;
+      padding: 4px 12px;
+      border-radius: 6px;
+      letter-spacing: 0.02em;
+    }
+    .demo-banner[hidden] { display: none; }
+
+    /* Hero card (the configured primary product) */
+    .hero-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-left: 4px solid #3b82f6;
+      border-radius: 12px;
+      padding: 28px;
+      cursor: pointer;
+      transition: box-shadow 0.2s, transform 0.1s;
+      margin-bottom: 28px;
+    }
+    .hero-card:hover {
+      box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+      transform: translateY(-2px);
+    }
+    .hero-card .card-header {
+      margin-bottom: 20px;
+    }
+    .hero-card .card-header h3 {
+      font-size: 1.35rem;
+    }
+    .hero-card .agg-score {
+      font-size: 1.5rem;
+    }
+    .hero-card .post-count {
+      font-size: 0.8rem;
+    }
+    .hero-card .dim-pie-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 16px;
+    }
+    @media (max-width: 900px) {
+      .hero-card .dim-pie-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+    @media (max-width: 580px) {
+      .hero-card .dim-pie-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    .hero-dim-cell {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    .hero-dim-cell .pie-wrap {
+      position: relative;
+      width: 110px;
+      height: 110px;
+    }
+    .hero-dim-cell .pie-wrap canvas {
+      width: 110px !important;
+      height: 110px !important;
+    }
+    .hero-dim-cell .pie-score {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 1rem;
+      font-weight: 700;
+      font-family: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, monospace;
+    }
+    .hero-dim-cell .dim-name {
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: #94a3b8;
+      text-transform: capitalize;
+    }
+    .hero-dim-cell .dim-applicable {
+      font-size: 0.7rem;
+      color: #64748b;
+    }
+    .hero-dim-cell .insufficient {
+      font-size: 0.7rem;
+      color: #64748b;
+      font-style: italic;
+      text-align: center;
+      margin-top: 20px;
+    }
+
+    .section-label {
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: #64748b;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #334155;
+    }
+
+    /* Dimension row in card */
+    .dim-row {
+      margin-bottom: 8px;
+    }
+    .dim-row:last-child { margin-bottom: 0; }
+    .dim-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 3px;
+    }
+    .dim-label span:first-child {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: #64748b;
+      text-transform: capitalize;
+    }
+    .dim-label .dim-score {
+      font-size: 0.75rem;
+      font-weight: 600;
+      font-family: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, monospace;
+    }
+    .dim-label .applicable-count {
+      font-size: 0.7rem;
+      color: #94a3b8;
+    }
+    .dim-bar {
+      height: 8px;
+      border-radius: 4px;
+      background: #334155;
+      overflow: hidden;
+      display: flex;
+    }
+    .dim-bar .seg {
+      height: 100%;
+      transition: width 0.3s;
+    }
+    .seg-positive { background: #22c55e; }
+    .seg-neutral { background: #6b7280; }
+    .seg-mixed { background: #f59e0b; }
+    .seg-negative { background: #ef4444; }
+
+    .insufficient {
+      font-size: 0.7rem;
+      color: #94a3b8;
+      font-style: italic;
+    }
+
+    /* Score colors */
+    .score-positive { color: #22c55e; }
+    .score-negative { color: #ef4444; }
+    .score-neutral { color: #64748b; }
+
+    /* View containers */
+    .view { display: none; }
+    .view.active { display: block; }
+
+    /* Trends view */
+    .trends-heading {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .trends-heading h2 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #f1f5f9;
+    }
+    .trends-heading .post-count {
+      font-size: 0.8rem;
+      color: #94a3b8;
+    }
+    .chart-container {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .chart-container canvas {
+      max-height: 360px;
+    }
+
+    /* Chart mode toggle */
+    .chart-mode-toggle {
+      display: flex;
+      gap: 0;
+      margin-left: auto;
+    }
+    .chart-mode-toggle button {
+      padding: 6px 14px;
+      font-size: 0.8rem;
+      border: 1px solid #334155;
+      background: transparent;
+      color: #94a3b8;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .chart-mode-toggle button:first-child { border-radius: 6px 0 0 6px; }
+    .chart-mode-toggle button:last-child { border-radius: 0 6px 6px 0; }
+    .chart-mode-toggle button:not(:first-child) { border-left: none; }
+    .chart-mode-toggle button.active {
+      background: #3b82f6;
+      color: #fff;
+      border-color: #3b82f6;
+    }
+    .chart-mode-toggle button:hover:not(.active) { background: #334155; }
+
+    /* Aggregate chart container */
+    .aggregate-chart-container {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .aggregate-chart-container canvas {
+      max-height: 360px;
+    }
+    .volume-legend {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-top: 8px;
+      font-size: 0.75rem;
+      color: #64748b;
+    }
+    .volume-legend .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .volume-legend .legend-swatch {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      display: inline-block;
+    }
+
+    /* Sparkline grid (by-dimension view) */
+    .sparkline-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .sparkline-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 12px 20px;
+    }
+    .sparkline-label {
+      min-width: 110px;
+      flex-shrink: 0;
+    }
+    .sparkline-label .dim-name {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #e2e8f0;
+      text-transform: capitalize;
+      display: block;
+    }
+    .sparkline-label .dim-score {
+      font-size: 1.1rem;
+      font-weight: 700;
+      font-family: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, monospace;
+    }
+    .sparkline-label .dim-posts {
+      font-size: 0.7rem;
+      color: #64748b;
+    }
+    .sparkline-chart {
+      flex: 1;
+      height: 80px;
+      min-width: 0;
+    }
+    .sparkline-chart canvas {
+      max-height: 80px;
+    }
+    .sparkline-insufficient {
+      flex: 1;
+      font-size: 0.8rem;
+      color: #64748b;
+      font-style: italic;
+      padding: 20px 0;
+    }
+
+    /* Stats table */
+    .tag-theme { background: rgba(148, 163, 184, 0.15); color: #cbd5e1; }
+    .inferred-note { color: #64748b; font-weight: 400; font-size: 0.8em; }
+    .theme-row:hover td { background: rgba(59, 130, 246, 0.08); }
+    .stats-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      margin-top: 16px;
+    }
+    .stats-table th, .stats-table td {
+      padding: 8px 12px;
+      text-align: left;
+      border-bottom: 1px solid #334155;
+    }
+    .stats-table th {
+      font-weight: 500;
+      color: #64748b;
+      text-transform: capitalize;
+      background: #0f172a;
+    }
+    .stats-table td { color: #e2e8f0; }
+
+    /* Posts view */
+    .filter-bar {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      margin-bottom: 16px;
+    }
+    .filter-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .filter-group label {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: #64748b;
+    }
+    .filter-group select, .filter-group input {
+      padding: 6px 10px;
+      font-size: 0.8rem;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      background: #0f172a;
+      color: #e2e8f0;
+    }
+
+    .active-filters {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .filter-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      background: #334155;
+      color: #e2e8f0;
+      border-radius: 12px;
+    }
+    .filter-pill .remove {
+      cursor: pointer;
+      font-weight: bold;
+      color: #94a3b8;
+      line-height: 1;
+    }
+    .filter-pill .remove:hover { color: #ef4444; }
+
+    .post-count-bar {
+      font-size: 0.85rem;
+      color: #64748b;
+      margin-bottom: 12px;
+    }
+
+    .post-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+    .post-card-header {
+      margin-bottom: 8px;
+    }
+    .post-card-header a {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #f1f5f9;
+      text-decoration: none;
+    }
+    .post-card-header a:hover { color: #3b82f6; text-decoration: underline; }
+    .post-meta {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+      font-size: 0.75rem;
+      color: #94a3b8;
+      margin-bottom: 8px;
+    }
+    .post-meta .badge {
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 0.7rem;
+      font-weight: 500;
+    }
+    .badge-subreddit {
+      background: rgba(59,130,246,0.15);
+      color: #60a5fa;
+    }
+    .badge-competitor {
+      background: #334155;
+      color: #94a3b8;
+    }
+    .post-body {
+      font-size: 0.85rem;
+      color: #94a3b8;
+      line-height: 1.6;
+      margin-bottom: 10px;
+    }
+    .post-body .expand-btn {
+      color: #3b82f6;
+      cursor: pointer;
+      font-size: 0.8rem;
+      background: none;
+      border: none;
+      padding: 0;
+    }
+    .post-body .expand-btn:hover { text-decoration: underline; }
+    .sentiment-tags {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+    .sentiment-tag {
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.7rem;
+      font-weight: 500;
+      text-transform: capitalize;
+    }
+    .tag-positive { background: rgba(34,197,94,0.15); color: #4ade80; }
+    .tag-negative { background: rgba(239,68,68,0.15); color: #f87171; }
+    .tag-neutral { background: rgba(107,114,128,0.15); color: #9ca3af; }
+    .tag-mixed { background: rgba(245,158,11,0.15); color: #fbbf24; }
+    .post-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .post-footer a {
+      font-size: 0.8rem;
+      color: #3b82f6;
+      text-decoration: none;
+    }
+    .post-footer a:hover { text-decoration: underline; }
+
+    /* Per-competitor sentiment groups */
+    .competitor-sentiment-group {
+      margin-bottom: 6px;
+    }
+    .competitor-sentiment-group .comp-name {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #94a3b8;
+      margin-bottom: 3px;
+    }
+
+    /* Comments section */
+    .comments-toggle {
+      font-size: 0.8rem;
+      color: #3b82f6;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px 0;
+    }
+    .comments-toggle:hover { text-decoration: underline; }
+    .comments-section {
+      display: none;
+      margin-top: 8px;
+      border-top: 1px solid #334155;
+      padding-top: 8px;
+    }
+    .comments-section.open { display: block; }
+    .comment-card {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+    }
+    .comment-meta {
+      font-size: 0.7rem;
+      color: #64748b;
+      margin-bottom: 4px;
+    }
+    .comment-body {
+      font-size: 0.8rem;
+      color: #94a3b8;
+      line-height: 1.5;
+      margin-bottom: 6px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #94a3b8;
+    }
+    .empty-state p {
+      font-size: 1rem;
+      margin-bottom: 8px;
+    }
+    .empty-state .sub {
+      font-size: 0.85rem;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #94a3b8;
+      font-size: 0.9rem;
+    }
+
+    .error-msg {
+      text-align: center;
+      padding: 40px;
+      color: #ef4444;
+      font-size: 0.9rem;
+      background: rgba(239,68,68,0.1);
+      border-radius: 8px;
+      border: 1px solid #334155;
+    }
+
+    /* View posts link on trends page */
+    .view-posts-link {
+      display: inline-block;
+      margin-top: 8px;
+      font-size: 0.85rem;
+      color: #3b82f6;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .view-posts-link:hover { text-decoration: underline; }
+
+    /* Posts heading */
+    .posts-heading {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #f1f5f9;
+      margin-bottom: 16px;
+    }
+
+    /* Annotations section */
+    .annotations-section {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 16px;
+      margin-top: 16px;
+      margin-bottom: 20px;
+    }
+    .annotations-section h3 {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #f1f5f9;
+      margin-bottom: 12px;
+    }
+    .annotation-form {
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .annotation-form .form-field {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .annotation-form label {
+      font-size: 0.7rem;
+      font-weight: 500;
+      color: #64748b;
+    }
+    .annotation-form input {
+      padding: 5px 8px;
+      font-size: 0.8rem;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      background: #0f172a;
+      color: #e2e8f0;
+    }
+    .annotation-form input[type="date"] { width: 140px; }
+    .annotation-form input[type="text"].ann-label { width: 200px; }
+    .annotation-form input[type="text"].ann-url { width: 180px; }
+    .annotation-form .btn-add {
+      padding: 5px 14px;
+      font-size: 0.8rem;
+      border: 1px solid #6366f1;
+      background: #6366f1;
+      color: #fff;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .annotation-form .btn-add:hover { background: #4f46e5; }
+    .annotation-list {
+      list-style: none;
+    }
+    .annotation-list li {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 4px 0;
+      border-bottom: 1px solid #334155;
+      font-size: 0.8rem;
+      color: #94a3b8;
+    }
+    .annotation-list li:last-child { border-bottom: none; }
+    .annotation-list .ann-date {
+      font-weight: 500;
+      color: #6366f1;
+      min-width: 90px;
+    }
+    .annotation-list .ann-label-text {
+      flex: 1;
+    }
+    .annotation-list .ann-delete {
+      background: none;
+      border: 1px solid transparent;
+      color: #94a3b8;
+      cursor: pointer;
+      font-size: 0.9rem;
+      padding: 2px 8px;
+      border-radius: 4px;
+      transition: all 0.15s;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .annotation-list .ann-delete:hover {
+      color: #ef4444;
+      background: rgba(239,68,68,0.1);
+      border-color: rgba(239,68,68,0.3);
+    }
+    .annotation-empty {
+      font-size: 0.8rem;
+      color: #94a3b8;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1 id="page-title">Sentiment Dashboard</h1>
+  <span class="demo-banner" id="demo-banner" hidden title="Seeded by seed-demo: invented products, comments and scores">Synthetic demo data · fictional products</span>
+  <div class="stats-bar" id="stats-bar">
+    <span>Loading stats...</span>
+  </div>
+</div>
+
+<!-- Overview View -->
+<div id="view-overview" class="view">
+  <div class="container">
+    <div class="controls">
+      <label>Time range:</label>
+      <div class="btn-group" id="overview-time-range">
+        <button data-range="7">7d</button>
+        <button data-range="30">30d</button>
+        <button data-range="90">90d</button>
+        <button data-range="0" class="active">All</button>
+      </div>
+      <label style="margin-left:12px">Sort:</label>
+      <div class="btn-group" id="overview-sort">
+        <button data-sort="posts" class="active">Most posts</button>
+        <button data-sort="alpha">A-Z</button>
+      </div>
+    </div>
+    <div id="overview-content">
+      <div class="loading">Loading overview...</div>
+    </div>
+  </div>
+</div>
+
+<!-- Trends View -->
+<div id="view-trends" class="view">
+  <div class="container">
+    <button class="back-btn" id="trends-back-btn">&larr; Back to overview</button>
+    <div class="trends-heading">
+      <h2 id="trends-competitor-name"></h2>
+      <span class="post-count" id="trends-post-count"></span>
+    </div>
+    <div class="controls">
+      <label>Time range:</label>
+      <div class="btn-group" id="trends-time-range">
+        <button data-range="7">7d</button>
+        <button data-range="30">30d</button>
+        <button data-range="90">90d</button>
+        <button data-range="0" class="active">All</button>
+      </div>
+      <div class="chart-mode-toggle" id="chart-mode-toggle">
+        <button data-mode="aggregate" class="active">Aggregate</button>
+        <button data-mode="dimensions">By Dimension</button>
+      </div>
+    </div>
+    <div id="aggregate-view">
+      <div class="aggregate-chart-container">
+        <canvas id="aggregate-chart"></canvas>
+      </div>
+    </div>
+    <div id="sparkline-view" style="display:none">
+      <div class="sparkline-grid" id="sparkline-grid"></div>
+    </div>
+    <div class="annotations-section" id="annotations-section">
+      <h3>Event Annotations</h3>
+      <form class="annotation-form" id="annotation-form">
+        <div class="form-field">
+          <label>Date</label>
+          <input type="date" id="ann-date" required>
+        </div>
+        <div class="form-field">
+          <label>Label</label>
+          <input type="text" class="ann-label" id="ann-label" placeholder="Event description" required>
+        </div>
+        <div class="form-field">
+          <label>URL (optional)</label>
+          <input type="text" class="ann-url" id="ann-url" placeholder="Source URL">
+        </div>
+        <button type="submit" class="btn-add">Add</button>
+      </form>
+      <ul class="annotation-list" id="annotation-list"></ul>
+    </div>
+    <a class="view-posts-link" id="trends-view-posts" href="#">View all posts for this product</a>
+    <div id="trends-stats-container">
+      <h3 style="font-size:0.9rem; color:#64748b; margin-bottom:8px; margin-top:20px;">Dimension summary</h3>
+      <table class="stats-table" id="trends-stats-table">
+        <thead>
+          <tr>
+            <th>Dimension</th>
+            <th>Applicable</th>
+            <th>Positive</th>
+            <th>Negative</th>
+            <th>Neutral</th>
+            <th>Mixed</th>
+          </tr>
+        </thead>
+        <tbody id="trends-stats-body"></tbody>
+      </table>
+      <h3 style="font-size:0.9rem; color:#64748b; margin-bottom:8px; margin-top:20px;">Themes <span style="font-weight:400">(what people discuss · time range above · click a row for the comments)</span></h3>
+      <table class="stats-table" id="trends-themes-table">
+        <thead>
+          <tr><th>Theme</th><th>Mentions</th><th>Positive</th><th>Negative</th><th>Neutral</th><th>Net</th></tr>
+        </thead>
+        <tbody id="trends-themes-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Posts View -->
+<div id="view-posts" class="view">
+  <div class="container">
+    <button class="back-btn" id="posts-back-btn">&larr; Back</button>
+    <h2 class="posts-heading">Posts</h2>
+    <div class="filter-bar" id="posts-filter-bar">
+      <div class="filter-group">
+        <label>Competitor</label>
+        <select id="filter-competitor"><option value="">All competitors</option></select>
+      </div>
+      <div class="filter-group">
+        <label>Subreddit</label>
+        <select id="filter-subreddit"><option value="">All subreddits</option></select>
+      </div>
+      <div class="filter-group">
+        <label>Dimension</label>
+        <select id="filter-dimension">
+          <option value="">Any</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Sentiment</label>
+        <select id="filter-sentiment">
+          <option value="">Any</option>
+          <option value="positive">Positive</option>
+          <option value="negative">Negative</option>
+          <option value="neutral">Neutral</option>
+          <option value="mixed">Mixed</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Theme</label>
+        <select id="filter-theme">
+          <option value="">Any</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Time range</label>
+        <div class="btn-group" id="posts-time-range">
+          <button data-range="7">7d</button>
+          <button data-range="30">30d</button>
+          <button data-range="90">90d</button>
+          <button data-range="0" class="active">All</button>
+        </div>
+      </div>
+      <button class="btn" onclick="applyPostFilters()" style="align-self:flex-end">Apply</button>
+    </div>
+    <div class="active-filters" id="active-filters"></div>
+    <div class="post-count-bar" id="posts-count-bar"></div>
+    <div id="posts-content">
+      <div class="loading">Loading posts...</div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ============================================
+  // State
+  // ============================================
+  // Filled from /api/config (config.yaml) before anything renders.
+  let DIMENSIONS = ['overall'];
+  let PRIMARY = '';
+  let MIN_N = 3;
+  const SENTIMENT_COLORS = {
+    positive: '#22c55e',
+    negative: '#ef4444',
+    neutral: '#6b7280',
+    mixed: '#f59e0b'
+  };
+
+  let THEME_LABELS = {};
+
+  const PALETTE = ['#0ea5e9', '#3b82f6', '#f59e0b', '#10b981', '#8b5cf6', '#f43f5e', '#14b8a6', '#eab308'];
+  const DIMENSION_COLORS = {};
+
+  async function loadConfig() {
+    const cfg = await apiFetch('/api/config');
+    DIMENSIONS = cfg.dimensions;
+    PRIMARY = cfg.primary_product;
+    MIN_N = cfg.min_n || 3;
+    THEME_LABELS = Object.fromEntries(cfg.themes.map(t => [t.key, t.label]));
+    DIMENSIONS.forEach((d, i) => { DIMENSION_COLORS[d] = PALETTE[i % PALETTE.length]; });
+    document.title = cfg.title;
+    document.getElementById('page-title').textContent = cfg.title;
+    document.getElementById('demo-banner').hidden = !cfg.demo;
+    const label = (k) => k.charAt(0).toUpperCase() + k.slice(1).replace(/_/g, ' ');
+    const dimSel = document.getElementById('filter-dimension');
+    for (const d of DIMENSIONS) dimSel.add(new Option(label(d), d));
+    const themeSel = document.getElementById('filter-theme');
+    for (const t of cfg.themes) themeSel.add(new Option(t.label, t.key));
+  }
+
+  let overviewData = [];
+  let overviewTimeRange = 0;
+  let overviewSort = 'posts';
+  let trendsCompetitor = '';
+  let trendsTimeRange = 0;
+  let trendsCharts = []; // array of Chart.js instances for cleanup
+  let trendsOverviewCache = null; // cache overview data for the stats table
+  let trendsAnnotations = []; // current annotations for trend chart
+  let trendsMode = 'aggregate'; // 'aggregate' | 'dimensions'
+  let lastAllDimData = null; // cached for mode switching without refetch
+  let lastAnnotations = null;
+  let previousView = 'overview';
+  let postsTimeRange = 0;
+
+  // ============================================
+  // Helpers
+  // ============================================
+  function sinceTimestamp(days) {
+    if (!days || days === 0) return 0;
+    return Math.floor(Date.now() / 1000) - (days * 86400);
+  }
+
+  function formatDate(isoStr) {
+    if (!isoStr) return '';
+    const d = new Date(isoStr);
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  function escapeHtml(text) {
+    const d = document.createElement('div');
+    d.textContent = text;
+    return d.innerHTML;
+  }
+
+  function truncateText(text, maxLen) {
+    if (!text || text.length <= maxLen) return { text: text || '', truncated: false };
+    return { text: text.substring(0, maxLen) + '...', truncated: true, full: text };
+  }
+
+  async function apiFetch(url) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }
+
+  // ============================================
+  // Score calculation
+  // ============================================
+  function calcScore(positive, negative, applicable) {
+    if (!applicable || applicable < MIN_N) return null;
+    return Math.round(((positive - negative) / applicable) * 100);
+  }
+
+  // Aggregate = the 'overall' dimension (every counted mention once). Averaging the
+  // aspect dimensions as before would double-count each mention.
+  function calcAggregateScore(dimensions, totalPosts) {
+    const d = dimensions.overall;
+    return d ? calcScore(d.positive, d.negative, d.applicable) : null;
+  }
+
+  function scoreColor(score) {
+    if (score === null) return 'score-neutral';
+    if (score > 10) return 'score-positive';
+    if (score < -10) return 'score-negative';
+    return 'score-neutral';
+  }
+
+  function formatScore(score) {
+    if (score === null) return '&mdash;';
+    const sign = score > 0 ? '+' : '';
+    return sign + score;
+  }
+
+  // ============================================
+  // Routing
+  // ============================================
+  function navigateTo(view, params) {
+    let hash = '#' + view;
+    if (params) {
+      const parts = [];
+      for (const [k, v] of Object.entries(params)) {
+        parts.push(encodeURIComponent(k) + '=' + encodeURIComponent(v));
+      }
+      if (parts.length) hash += '?' + parts.join('&');
+    }
+    location.hash = hash;
+  }
+
+  function parseHash() {
+    const hash = location.hash.slice(1) || 'overview';
+    const qIdx = hash.indexOf('?');
+    let path = qIdx >= 0 ? hash.substring(0, qIdx) : hash;
+    const queryStr = qIdx >= 0 ? hash.substring(qIdx + 1) : '';
+    const params = {};
+    if (queryStr) {
+      for (const part of queryStr.split('&')) {
+        const [k, v] = part.split('=');
+        if (k) params[decodeURIComponent(k)] = v ? decodeURIComponent(v) : '';
+      }
+    }
+
+    // Handle #trends/<competitor>
+    if (path.startsWith('trends/')) {
+      params.competitor = decodeURIComponent(path.substring(7));
+      path = 'trends';
+    }
+
+    return { view: path, params };
+  }
+
+  function route() {
+    const { view, params } = parseHash();
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+
+    if (view === 'trends' && params.competitor) {
+      previousView = 'overview';
+      document.getElementById('view-trends').classList.add('active');
+      showTrends(params.competitor);
+    } else if (view === 'posts') {
+      document.getElementById('view-posts').classList.add('active');
+      showPosts(params);
+    } else {
+      document.getElementById('view-overview').classList.add('active');
+      loadOverview();
+    }
+  }
+
+  function goBack() {
+    if (previousView === 'trends' && trendsCompetitor) {
+      navigateTo('trends/' + encodeURIComponent(trendsCompetitor));
+    } else {
+      navigateTo('overview');
+    }
+  }
+
+  window.addEventListener('hashchange', route);
+
+  // Back button handlers (inside IIFE so they can access navigateTo/goBack)
+  document.getElementById('trends-back-btn').addEventListener('click', () => navigateTo('overview'));
+  document.getElementById('posts-back-btn').addEventListener('click', () => goBack());
+
+  // ============================================
+  // Stats bar
+  // ============================================
+  async function loadStats() {
+    try {
+      const stats = await apiFetch('/api/stats');
+      const bar = document.getElementById('stats-bar');
+      const earliest = stats.date_range.earliest ? formatDate(stats.date_range.earliest) : 'N/A';
+      const latest = stats.date_range.latest ? formatDate(stats.date_range.latest) : 'N/A';
+      bar.innerHTML = `
+        <span><strong>${stats.total_posts}</strong> posts</span>
+        <span><strong>${stats.classified_posts}</strong> classified</span>
+        <span><strong>${stats.competitor_count}</strong> competitors</span>
+        <span>${earliest} - ${latest}</span>
+      `;
+    } catch (err) {
+      document.getElementById('stats-bar').innerHTML = '<span>Stats unavailable</span>';
+    }
+  }
+
+  // ============================================
+  // Overview View
+  // ============================================
+  async function loadOverview() {
+    const container = document.getElementById('overview-content');
+    container.innerHTML = '<div class="loading">Loading overview...</div>';
+
+    try {
+      const since = sinceTimestamp(overviewTimeRange);
+      overviewData = await apiFetch('/api/overview?since=' + since);
+      renderOverview();
+    } catch (err) {
+      container.innerHTML = '<div class="error-msg">Failed to load data. Is the server running?</div>';
+    }
+  }
+
+  function renderOverview() {
+    const container = document.getElementById('overview-content');
+    if (!overviewData || overviewData.length === 0) {
+      container.innerHTML = '<div class="empty-state"><p>No data found</p><p class="sub">Try a different time range</p></div>';
+      return;
+    }
+
+    let sorted = [...overviewData];
+    if (overviewSort === 'alpha') {
+      sorted.sort((a, b) => a.competitor.localeCompare(b.competitor));
+    } else {
+      sorted.sort((a, b) => b.total_posts - a.total_posts);
+    }
+
+    // The primary product gets the hero card; the rest are competitors
+    const primary = sorted.find(c => c.competitor === PRIMARY);
+    const others = sorted.filter(c => c.competitor !== PRIMARY);
+
+    let html = '';
+
+    if (primary) {
+      html += renderHeroCard(primary);
+    }
+
+    // Other competitors grid
+    if (others.length > 0) {
+      html += '<div class="section-label">Other Competitors</div>';
+      html += '<div class="card-grid">';
+      for (const item of others) {
+        html += renderCompetitorCard(item);
+      }
+      html += '</div>';
+    }
+
+    container.innerHTML = html;
+
+    if (primary) {
+      renderHeroPieCharts(primary);
+    }
+
+    // Attach click handlers
+    container.querySelectorAll('.card, .hero-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const comp = card.dataset.competitor;
+        navigateTo('trends/' + encodeURIComponent(comp));
+      });
+    });
+  }
+
+  let heroPieCharts = [];
+
+  function renderHeroCard(item) {
+    const aggScore = calcAggregateScore(item.dimensions, item.total_posts);
+
+    let dimsHtml = '<div class="dim-pie-grid">';
+    for (const dim of DIMENSIONS) {
+      const d = item.dimensions[dim];
+      const applicable = d.applicable || 0;
+      if (applicable < MIN_N) {
+        dimsHtml += `
+          <div class="hero-dim-cell">
+            <div class="pie-wrap">
+              <div class="insufficient">Insufficient data</div>
+            </div>
+            <span class="dim-name">${dim}</span>
+            <span class="dim-applicable">${applicable} of ${item.total_posts} posts</span>
+          </div>`;
+      } else {
+        const dimScore = calcScore(d.positive || 0, d.negative || 0, applicable);
+        dimsHtml += `
+          <div class="hero-dim-cell">
+            <div class="pie-wrap">
+              <canvas id="hero-pie-${dim}"></canvas>
+              <span class="pie-score ${scoreColor(dimScore)}">${formatScore(dimScore)}</span>
+            </div>
+            <span class="dim-name">${dim}</span>
+            <span class="dim-applicable">${applicable} of ${item.total_posts} posts</span>
+          </div>`;
+      }
+    }
+    dimsHtml += '</div>';
+
+    return `
+      <div class="hero-card" data-competitor="${escapeHtml(item.competitor)}">
+        <div class="card-header">
+          <h3>${escapeHtml(item.competitor)}</h3>
+          <div class="header-right">
+            <span class="agg-score ${scoreColor(aggScore)}">${formatScore(aggScore)}</span>
+            <span class="post-count">${item.total_posts} posts</span>
+          </div>
+        </div>
+        ${dimsHtml}
+      </div>`;
+  }
+
+  function renderHeroPieCharts(item) {
+    // Destroy previous hero pie charts
+    for (const c of heroPieCharts) c.destroy();
+    heroPieCharts = [];
+
+    for (const dim of DIMENSIONS) {
+      const canvas = document.getElementById('hero-pie-' + dim);
+      if (!canvas) continue;
+
+      const d = item.dimensions[dim];
+      const pos = d.positive || 0;
+      const neg = d.negative || 0;
+      const neu = d.neutral || 0;
+      const mix = d.mixed || 0;
+
+      const chart = new Chart(canvas, {
+        type: 'doughnut',
+        data: {
+          labels: ['Positive', 'Neutral', 'Mixed', 'Negative'],
+          datasets: [{
+            data: [pos, neu, mix, neg],
+            backgroundColor: [
+              SENTIMENT_COLORS.positive,
+              SENTIMENT_COLORS.neutral,
+              SENTIMENT_COLORS.mixed,
+              SENTIMENT_COLORS.negative
+            ],
+            borderWidth: 0,
+            hoverOffset: 4
+          }]
+        },
+        options: {
+          responsive: false,
+          cutout: '60%',
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#1e293b',
+              titleColor: '#f1f5f9',
+              bodyColor: '#e2e8f0',
+              borderColor: '#334155',
+              borderWidth: 1,
+              callbacks: {
+                label: function(ctx) {
+                  const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                  const pct = total > 0 ? Math.round((ctx.raw / total) * 100) : 0;
+                  return ctx.label + ': ' + ctx.raw + ' (' + pct + '%)';
+                }
+              }
+            }
+          }
+        }
+      });
+      heroPieCharts.push(chart);
+    }
+  }
+
+  function renderCompetitorCard(item) {
+    const aggScore = calcAggregateScore(item.dimensions, item.total_posts);
+
+    let dimsHtml = '';
+    for (const dim of DIMENSIONS) {
+      dimsHtml += renderDimRow(item, dim);
+    }
+
+    return `
+      <div class="card" data-competitor="${escapeHtml(item.competitor)}">
+        <div class="card-header">
+          <h3>${escapeHtml(item.competitor)}</h3>
+          <div class="header-right">
+            <span class="agg-score ${scoreColor(aggScore)}">${formatScore(aggScore)}</span>
+            <span class="post-count">${item.total_posts} posts</span>
+          </div>
+        </div>
+        ${dimsHtml}
+      </div>`;
+  }
+
+  function renderDimRow(item, dim) {
+    const d = item.dimensions[dim];
+    const applicable = d.applicable || 0;
+    const total = item.total_posts;
+
+    if (applicable < MIN_N) {
+      return `
+        <div class="dim-row">
+          <div class="dim-label">
+            <span>${dim}</span>
+            <span class="applicable-count">${applicable} of ${total} posts</span>
+          </div>
+          <div class="insufficient">Insufficient data</div>
+        </div>`;
+    }
+
+    const pos = d.positive || 0;
+    const neg = d.negative || 0;
+    const neu = d.neutral || 0;
+    const mix = d.mixed || 0;
+    const total_app = pos + neg + neu + mix || 1;
+    const dimScore = calcScore(pos, neg, applicable);
+
+    return `
+      <div class="dim-row">
+        <div class="dim-label">
+          <span>${dim}</span>
+          <span class="dim-score ${scoreColor(dimScore)}">${formatScore(dimScore)}</span>
+          <span class="applicable-count">${applicable} of ${total} posts</span>
+        </div>
+        <div class="dim-bar">
+          <div class="seg seg-positive" style="width:${(pos/total_app)*100}%" title="Positive: ${pos}"></div>
+          <div class="seg seg-neutral" style="width:${(neu/total_app)*100}%" title="Neutral: ${neu}"></div>
+          <div class="seg seg-mixed" style="width:${(mix/total_app)*100}%" title="Mixed: ${mix}"></div>
+          <div class="seg seg-negative" style="width:${(neg/total_app)*100}%" title="Negative: ${neg}"></div>
+        </div>
+      </div>`;
+  }
+
+  // Overview controls
+  document.getElementById('overview-time-range').addEventListener('click', (e) => {
+    if (e.target.tagName !== 'BUTTON') return;
+    document.querySelectorAll('#overview-time-range button').forEach(b => b.classList.remove('active'));
+    e.target.classList.add('active');
+    overviewTimeRange = parseInt(e.target.dataset.range);
+    loadOverview();
+  });
+
+  document.getElementById('overview-sort').addEventListener('click', (e) => {
+    if (e.target.tagName !== 'BUTTON') return;
+    document.querySelectorAll('#overview-sort button').forEach(b => b.classList.remove('active'));
+    e.target.classList.add('active');
+    overviewSort = e.target.dataset.sort;
+    renderOverview();
+  });
+
+  // ============================================
+  // Trends View
+  // ============================================
+  async function showTrends(competitor) {
+    trendsCompetitor = competitor;
+
+    document.getElementById('trends-competitor-name').textContent = competitor;
+    document.getElementById('trends-view-posts').onclick = (e) => {
+      e.preventDefault();
+      previousView = 'trends';
+      navigateTo('posts', { competitor: competitor });
+    };
+
+    setAnnotationFormDefaults();
+    await loadTrends();
+    await loadTrendsStats(competitor);
+  }
+
+  async function loadTrends() {
+    try {
+      const since = sinceTimestamp(trendsTimeRange);
+      const compEnc = encodeURIComponent(trendsCompetitor);
+
+      // Fetch all dimensions in parallel + annotations
+      const fetches = DIMENSIONS.map(dim =>
+        apiFetch('/api/trends?competitor=' + compEnc + '&dimension=' + dim + '&since=' + since)
+      );
+      fetches.push(
+        apiFetch('/api/annotations?competitor=' + compEnc + (since ? '&since=' + since : ''))
+      );
+
+      const results = await Promise.all(fetches);
+      const annotations = results.pop();
+      const allDimData = {};
+      DIMENSIONS.forEach((dim, i) => { allDimData[dim] = results[i]; });
+
+      trendsAnnotations = annotations;
+      renderTrendsChart(allDimData, annotations);
+      renderAnnotationList(annotations);
+    } catch (err) {
+      document.getElementById('aggregate-view').innerHTML = '<div class="aggregate-chart-container"><div class="error-msg">Failed to load trend data.</div><canvas id="aggregate-chart" style="display:none"></canvas></div>';
+      document.getElementById('sparkline-grid').innerHTML = '<div class="error-msg">Failed to load trend data.</div>';
+    }
+  }
+
+  async function loadTrendsStats(competitor) {
+    try {
+      // Fetch overview for this competitor to get dimension stats
+      const data = await apiFetch('/api/overview?since=0');
+      const comp = data.find(c => c.competitor === competitor);
+      if (!comp) return;
+
+      trendsOverviewCache = comp;
+      document.getElementById('trends-post-count').textContent = comp.total_posts + ' posts total';
+
+      const tbody = document.getElementById('trends-stats-body');
+      let html = '';
+      for (const dim of DIMENSIONS) {
+        const d = comp.dimensions[dim];
+        html += `<tr>
+          <td>${dim}</td>
+          <td>${d.applicable} of ${comp.total_posts}</td>
+          <td>${d.positive}</td>
+          <td>${d.negative}</td>
+          <td>${d.neutral}</td>
+          <td>${d.mixed}</td>
+        </tr>`;
+      }
+      tbody.innerHTML = html;
+    } catch (err) {
+      // Silently ignore stats load failure
+    }
+    await loadTrendsThemes(competitor);
+  }
+
+  async function loadTrendsThemes(competitor) {
+    const tbody = document.getElementById('trends-themes-body');
+    try {
+      const since = sinceTimestamp(trendsTimeRange);
+      const rows = await apiFetch('/api/themes?competitor=' + encodeURIComponent(competitor) + '&since=' + since);
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="color:#64748b">No themed mentions in this range</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map(r => {
+        const net = calcScore(r.positive, r.negative, r.total);
+        const netTxt = net === null ? '—' : (net > 0 ? '+' : '') + net;
+        return `<tr class="theme-row" style="cursor:pointer" onclick="openTheme('${r.theme}')">
+          <td>${escapeHtml(THEME_LABELS[r.theme] || r.theme)}</td><td>${r.total}</td>
+          <td>${r.positive}</td><td>${r.negative}</td><td>${r.neutral}</td>
+          <td class="${scoreColor(net)}">${netTxt}</td></tr>`;
+      }).join('');
+    } catch (err) {
+      tbody.innerHTML = '<tr><td colspan="6" class="error-msg">Failed to load themes</td></tr>';
+    }
+  }
+
+  window.openTheme = function(theme) {
+    previousView = 'trends';
+    const params = { competitor: trendsCompetitor, theme: theme };
+    const since = sinceTimestamp(trendsTimeRange);
+    if (since) params.since = since;
+    navigateTo('posts', params);
+  };
+
+  // ---- Weekly bucketing helpers ----
+
+  function getISOWeek(dateStr) {
+    // Returns 'YYYY-Www' ISO week string for a date
+    const d = new Date(dateStr + 'T00:00:00Z');
+    const dayOfWeek = d.getUTCDay() || 7; // Mon=1..Sun=7
+    d.setUTCDate(d.getUTCDate() + 4 - dayOfWeek); // Thursday of that week
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    const weekNo = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+    return d.getUTCFullYear() + '-W' + String(weekNo).padStart(2, '0');
+  }
+
+  function weekToDate(weekStr) {
+    // Convert 'YYYY-Www' to the Monday of that week as 'YYYY-MM-DD'
+    const [yearStr, wStr] = weekStr.split('-W');
+    const year = parseInt(yearStr);
+    const week = parseInt(wStr);
+    // Jan 4 is always in week 1
+    const jan4 = new Date(Date.UTC(year, 0, 4));
+    const dayOfWeek = jan4.getUTCDay() || 7;
+    const monday = new Date(jan4);
+    monday.setUTCDate(jan4.getUTCDate() - dayOfWeek + 1 + (week - 1) * 7);
+    return monday.toISOString().split('T')[0];
+  }
+
+  function bucketByWeek(dayData) {
+    // Groups daily trend data into ISO week buckets
+    // Returns [{week, weekDate, positive, negative, neutral, mixed, total}]
+    const weekMap = {};
+    for (const row of dayData) {
+      const week = getISOWeek(row.day);
+      if (!weekMap[week]) {
+        weekMap[week] = { week, positive: 0, negative: 0, neutral: 0, mixed: 0, total: 0 };
+      }
+      weekMap[week].positive += (row.positive || 0);
+      weekMap[week].negative += (row.negative || 0);
+      weekMap[week].neutral += (row.neutral || 0);
+      weekMap[week].mixed += (row.mixed || 0);
+      weekMap[week].total += (row.total || 0);
+    }
+    return Object.values(weekMap)
+      .sort((a, b) => a.week.localeCompare(b.week))
+      .map(b => ({ ...b, weekDate: weekToDate(b.week) }));
+  }
+
+  function calcWeeklyScore(bucket) {
+    if (!bucket.total || bucket.total < 1) return null;
+    return Math.round(((bucket.positive - bucket.negative) / bucket.total) * 100);
+  }
+
+  function rollingAverage(weeklyScores, windowSize) {
+    // Computes trailing N-week rolling average; returns array same length as input
+    const result = [];
+    for (let i = 0; i < weeklyScores.length; i++) {
+      const start = Math.max(0, i - windowSize + 1);
+      let sum = 0, count = 0;
+      for (let j = start; j <= i; j++) {
+        if (weeklyScores[j] !== null) {
+          sum += weeklyScores[j];
+          count++;
+        }
+      }
+      result.push(count > 0 ? Math.round(sum / count) : null);
+    }
+    return result;
+  }
+
+  function destroyTrendsCharts() {
+    for (const c of trendsCharts) {
+      try { c.destroy(); } catch(e) {}
+    }
+    trendsCharts = [];
+  }
+
+  // ---- Main render orchestrator ----
+
+  function renderTrendsChart(allDimData, annotations) {
+    destroyTrendsCharts();
+    lastAllDimData = allDimData;
+    lastAnnotations = annotations;
+
+    // Check if any dimension has data
+    const hasData = DIMENSIONS.some(dim => allDimData[dim] && allDimData[dim].length > 0);
+    const aggContainer = document.getElementById('aggregate-view');
+
+    if (!hasData) {
+      aggContainer.innerHTML = '<div class="aggregate-chart-container"><div class="empty-state"><p>No trend data available</p><p class="sub">Try a different time range</p></div><canvas id="aggregate-chart" style="display:none"></canvas></div>';
+      document.getElementById('sparkline-grid').innerHTML = '<div class="empty-state"><p>No trend data available</p><p class="sub">Try a different time range</p></div>';
+      return;
+    }
+
+    // Restore aggregate canvas if needed
+    if (!document.getElementById('aggregate-chart')) {
+      aggContainer.innerHTML = '<div class="aggregate-chart-container"><canvas id="aggregate-chart"></canvas></div>';
+    }
+
+    // Bucket each dimension by week
+    const weeklyByDim = {};
+    for (const dim of DIMENSIONS) {
+      weeklyByDim[dim] = bucketByWeek(allDimData[dim] || []);
+    }
+
+    renderAggregateChart(weeklyByDim, annotations);
+    renderSparklines(weeklyByDim);
+  }
+
+  // ---- Aggregate chart ----
+
+  function renderAggregateChart(weeklyByDim, annotations) {
+    const ctx = document.getElementById('aggregate-chart');
+    if (!ctx) return;
+    ctx.style.display = 'block';
+
+    // Collect all unique weeks across all dimensions
+    const weekSet = new Set();
+    for (const dim of DIMENSIONS) {
+      for (const b of weeklyByDim[dim]) weekSet.add(b.week);
+    }
+    const allWeeks = [...weekSet].sort();
+    const weekDates = allWeeks.map(w => weekToDate(w));
+
+    // Compute aggregate score per week (average of dimensions with data)
+    const aggScores = allWeeks.map((week) => {
+      const bucket = weeklyByDim.overall.find(b => b.week === week);
+      return bucket && bucket.total >= 1 ? calcWeeklyScore(bucket) : null;
+    });
+
+    // Volume per week (total posts across all dimensions — use max of dim totals to avoid double-counting)
+    const volumePerWeek = allWeeks.map((week) => {
+      // Sum unique posts: we take the max total across dimensions as a proxy
+      // since the API returns per-dimension counts and posts can span multiple dims
+      let maxTotal = 0;
+      for (const dim of DIMENSIONS) {
+        const bucket = weeklyByDim[dim].find(b => b.week === week);
+        if (bucket) maxTotal = Math.max(maxTotal, bucket.total);
+      }
+      return maxTotal;
+    });
+
+    // Rolling average (4-week window)
+    const rollingAvg = rollingAverage(aggScores, 4);
+
+    // Scatter data points (weekly scores)
+    const scatterData = weekDates.map((d, i) => aggScores[i] !== null ? { x: d, y: aggScores[i] } : null).filter(Boolean);
+
+    // Trend line data
+    const trendData = weekDates.map((d, i) => ({ x: d, y: rollingAvg[i] }));
+
+    // Volume bar data
+    const volumeData = weekDates.map((d, i) => ({ x: d, y: volumePerWeek[i] }));
+
+    // Build annotation plugin config
+    const annotationConfig = {};
+    if (annotations && annotations.length > 0) {
+      for (const ann of annotations) {
+        annotationConfig['ann_' + ann.id] = {
+          type: 'line',
+          xMin: ann.event_date,
+          xMax: ann.event_date,
+          borderColor: '#6366f1',
+          borderWidth: 2,
+          borderDash: [6, 3],
+          label: {
+            content: ann.label,
+            display: true,
+            position: 'start',
+            backgroundColor: '#6366f1',
+            color: '#fff',
+            font: { size: 11 },
+            padding: 4
+          }
+        };
+      }
+    }
+
+    const chart = new Chart(ctx, {
+      type: 'scatter',
+      data: {
+        datasets: [
+          {
+            label: 'Weekly Score',
+            type: 'scatter',
+            data: scatterData,
+            backgroundColor: '#3b82f6',
+            borderColor: '#3b82f6',
+            pointRadius: 5,
+            pointHoverRadius: 8,
+            order: 1,
+            yAxisID: 'y'
+          },
+          {
+            label: '4-week Trend',
+            type: 'line',
+            data: trendData,
+            borderColor: '#f59e0b',
+            backgroundColor: 'transparent',
+            borderWidth: 2.5,
+            tension: 0.4,
+            pointRadius: 0,
+            pointHoverRadius: 0,
+            spanGaps: true,
+            order: 2,
+            yAxisID: 'y'
+          },
+          {
+            label: 'Posts/week',
+            type: 'bar',
+            data: volumeData,
+            backgroundColor: 'rgba(148,163,184,0.2)',
+            borderColor: 'rgba(148,163,184,0.4)',
+            borderWidth: 1,
+            barPercentage: 0.6,
+            order: 3,
+            yAxisID: 'y1'
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        interaction: {
+          mode: 'nearest',
+          intersect: false
+        },
+        plugins: {
+          tooltip: {
+            backgroundColor: '#1e293b',
+            titleColor: '#f1f5f9',
+            bodyColor: '#e2e8f0',
+            borderColor: '#334155',
+            borderWidth: 1,
+            callbacks: {
+              title: function(items) {
+                if (items.length) {
+                  const d = new Date(items[0].parsed.x);
+                  return 'Week of ' + d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+                }
+                return '';
+              },
+              label: function(ctx) {
+                if (ctx.dataset.label === 'Posts/week') {
+                  return ' Posts: ' + ctx.raw.y;
+                }
+                const val = ctx.raw.y;
+                if (val === null) return null;
+                const sign = val > 0 ? '+' : '';
+                return ' ' + ctx.dataset.label + ': ' + sign + val;
+              }
+            }
+          },
+          legend: {
+            position: 'top',
+            labels: {
+              usePointStyle: true,
+              pointStyle: function(ctx) {
+                if (ctx.text === 'Posts/week') return 'rect';
+                if (ctx.text === '4-week Trend') return 'line';
+                return 'circle';
+              },
+              color: '#94a3b8'
+            }
+          },
+          annotation: {
+            annotations: annotationConfig
+          }
+        },
+        scales: {
+          x: {
+            type: 'time',
+            time: {
+              unit: 'week',
+              displayFormats: { week: 'MMM d' },
+              tooltipFormat: 'MMM d, yyyy'
+            },
+            grid: { display: false },
+            ticks: { color: '#94a3b8' }
+          },
+          y: {
+            position: 'left',
+            title: {
+              display: true,
+              text: 'Sentiment Score',
+              color: '#64748b',
+              font: { size: 12 }
+            },
+            min: -100,
+            max: 100,
+            ticks: {
+              stepSize: 50,
+              color: '#94a3b8',
+              callback: function(val) {
+                return (val > 0 ? '+' : '') + val;
+              }
+            },
+            grid: { color: '#334155' }
+          },
+          y1: {
+            position: 'right',
+            title: {
+              display: true,
+              text: 'Posts',
+              color: '#64748b',
+              font: { size: 12 }
+            },
+            min: 0,
+            grid: { display: false },
+            ticks: {
+              color: '#94a3b8',
+              precision: 0
+            }
+          }
+        },
+        onClick: function(event, elements) {
+          if (elements.length > 0) {
+            const el = elements[0];
+            const dataPoint = chart.data.datasets[el.datasetIndex].data[el.index];
+            if (dataPoint && dataPoint.x) {
+              previousView = 'trends';
+              // Navigate to posts for the week starting on that date
+              const weekStart = dataPoint.x;
+              const weekEnd = new Date(new Date(weekStart + 'T00:00:00Z').getTime() + 6 * 86400000).toISOString().split('T')[0];
+              navigateTo('posts', {
+                competitor: trendsCompetitor,
+                since: Math.floor(new Date(weekStart + 'T00:00:00Z').getTime() / 1000),
+                until: Math.floor(new Date(weekEnd + 'T23:59:59Z').getTime() / 1000)
+              });
+            }
+          }
+        }
+      }
+    });
+    trendsCharts.push(chart);
+  }
+
+  // ---- Sparkline charts (by dimension) ----
+
+  function renderSparklines(weeklyByDim) {
+    const grid = document.getElementById('sparkline-grid');
+    grid.innerHTML = '';
+
+    // Compute shared x-axis range across all dimensions
+    const allWeekDates = new Set();
+    for (const dim of DIMENSIONS) {
+      for (const b of weeklyByDim[dim]) allWeekDates.add(b.weekDate);
+    }
+    const sortedDates = [...allWeekDates].sort();
+    const xMin = sortedDates.length > 0 ? sortedDates[0] : undefined;
+    const xMax = sortedDates.length > 0 ? sortedDates[sortedDates.length - 1] : undefined;
+
+    for (const dim of DIMENSIONS) {
+      const weekly = weeklyByDim[dim];
+      const row = document.createElement('div');
+      row.className = 'sparkline-row';
+
+      // Calculate overall score for label
+      let totalPos = 0, totalNeg = 0, totalApp = 0;
+      for (const b of weekly) {
+        totalPos += b.positive;
+        totalNeg += b.negative;
+        totalApp += b.total;
+      }
+      const overallScore = totalApp >= MIN_N ? calcScore(totalPos, totalNeg, totalApp) : null;
+
+      // Label
+      const label = document.createElement('div');
+      label.className = 'sparkline-label';
+      label.innerHTML = `
+        <span class="dim-name">${dim}</span>
+        <span class="dim-score ${scoreColor(overallScore)}">${formatScore(overallScore)}</span>
+        <span class="dim-posts">${totalApp} posts</span>
+      `;
+      row.appendChild(label);
+
+      if (totalApp < MIN_N) {
+        // Insufficient data
+        const insuf = document.createElement('div');
+        insuf.className = 'sparkline-insufficient';
+        insuf.textContent = 'Insufficient data';
+        row.appendChild(insuf);
+      } else {
+        // Chart canvas
+        const chartWrap = document.createElement('div');
+        chartWrap.className = 'sparkline-chart';
+        const canvas = document.createElement('canvas');
+        chartWrap.appendChild(canvas);
+        row.appendChild(chartWrap);
+
+        // Build data
+        const scores = weekly.map(b => calcWeeklyScore(b));
+        const dates = weekly.map(b => b.weekDate);
+        const volumes = weekly.map(b => b.total);
+        const rolling = rollingAverage(scores, 4);
+
+        const scatterData = dates.map((d, i) => scores[i] !== null ? { x: d, y: scores[i] } : null).filter(Boolean);
+        const trendData = dates.map((d, i) => ({ x: d, y: rolling[i] }));
+        const volumeData = dates.map((d, i) => ({ x: d, y: volumes[i] }));
+
+        // Defer chart creation until canvas is in DOM
+        grid.appendChild(row);
+
+        const chart = new Chart(canvas, {
+          type: 'scatter',
+          data: {
+            datasets: [
+              {
+                label: 'Score',
+                type: 'scatter',
+                data: scatterData,
+                backgroundColor: DIMENSION_COLORS[dim],
+                borderColor: DIMENSION_COLORS[dim],
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                order: 1,
+                yAxisID: 'y'
+              },
+              {
+                label: 'Trend',
+                type: 'line',
+                data: trendData,
+                borderColor: DIMENSION_COLORS[dim] + 'aa',
+                backgroundColor: 'transparent',
+                borderWidth: 2,
+                tension: 0.4,
+                pointRadius: 0,
+                pointHoverRadius: 0,
+                spanGaps: true,
+                order: 2,
+                yAxisID: 'y'
+              },
+              {
+                label: 'Volume',
+                type: 'bar',
+                data: volumeData,
+                backgroundColor: DIMENSION_COLORS[dim] + '22',
+                borderColor: DIMENSION_COLORS[dim] + '44',
+                borderWidth: 1,
+                barPercentage: 0.5,
+                order: 3,
+                yAxisID: 'y1'
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: '#1e293b',
+                titleColor: '#f1f5f9',
+                bodyColor: '#e2e8f0',
+                borderColor: '#334155',
+                borderWidth: 1,
+                callbacks: {
+                  title: function(items) {
+                    if (items.length) {
+                      const d = new Date(items[0].parsed.x);
+                      return 'Week of ' + d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+                    }
+                    return '';
+                  },
+                  label: function(ctx) {
+                    if (ctx.dataset.label === 'Volume') return ' Posts: ' + ctx.raw.y;
+                    const val = ctx.raw.y;
+                    if (val === null) return null;
+                    const sign = val > 0 ? '+' : '';
+                    return ' Score: ' + sign + val;
+                  }
+                }
+              }
+            },
+            scales: {
+              x: {
+                type: 'time',
+                time: {
+                  unit: 'week',
+                  displayFormats: { week: 'MMM' }
+                },
+                min: xMin,
+                max: xMax,
+                grid: { display: false },
+                ticks: {
+                  color: '#64748b',
+                  font: { size: 10 },
+                  maxTicksLimit: 6
+                }
+              },
+              y: {
+                position: 'left',
+                min: -100,
+                max: 100,
+                ticks: {
+                  stepSize: 100,
+                  color: '#64748b',
+                  font: { size: 10 },
+                  callback: function(val) {
+                    return (val > 0 ? '+' : '') + val;
+                  }
+                },
+                grid: { color: '#334155', lineWidth: 0.5 }
+              },
+              y1: {
+                position: 'right',
+                min: 0,
+                grid: { display: false },
+                ticks: { display: false }
+              }
+            },
+            onClick: function(event, elements) {
+              if (elements.length > 0) {
+                const el = elements[0];
+                const dataPoint = chart.data.datasets[el.datasetIndex].data[el.index];
+                if (dataPoint && dataPoint.x) {
+                  previousView = 'trends';
+                  navigateTo('posts', {
+                    competitor: trendsCompetitor,
+                    dimension: dim,
+                    since: Math.floor(new Date(dataPoint.x + 'T00:00:00Z').getTime() / 1000),
+                    until: Math.floor(new Date(dataPoint.x + 'T00:00:00Z').getTime() / 1000) + 6 * 86400
+                  });
+                }
+              }
+            }
+          }
+        });
+        trendsCharts.push(chart);
+        continue; // already appended row
+      }
+
+      grid.appendChild(row);
+    }
+  }
+
+  // Trends controls
+  document.getElementById('trends-time-range').addEventListener('click', (e) => {
+    if (e.target.tagName !== 'BUTTON') return;
+    document.querySelectorAll('#trends-time-range button').forEach(b => b.classList.remove('active'));
+    e.target.classList.add('active');
+    trendsTimeRange = parseInt(e.target.dataset.range);
+    loadTrends();
+    loadTrendsThemes(trendsCompetitor);
+  });
+
+  // Chart mode toggle
+  document.getElementById('chart-mode-toggle').addEventListener('click', (e) => {
+    if (e.target.tagName !== 'BUTTON') return;
+    document.querySelectorAll('#chart-mode-toggle button').forEach(b => b.classList.remove('active'));
+    e.target.classList.add('active');
+    trendsMode = e.target.dataset.mode;
+
+    const aggView = document.getElementById('aggregate-view');
+    const sparkView = document.getElementById('sparkline-view');
+    if (trendsMode === 'aggregate') {
+      aggView.style.display = '';
+      sparkView.style.display = 'none';
+    } else {
+      aggView.style.display = 'none';
+      sparkView.style.display = '';
+    }
+  });
+
+  // ============================================
+  // Annotations
+  // ============================================
+  function renderAnnotationList(annotations) {
+    const list = document.getElementById('annotation-list');
+    if (!annotations || annotations.length === 0) {
+      list.innerHTML = '<li class="annotation-empty">No annotations yet</li>';
+      return;
+    }
+    let html = '';
+    for (const ann of annotations) {
+      html += `<li>
+        <span class="ann-date">${escapeHtml(ann.event_date)}</span>
+        <span class="ann-label-text">${escapeHtml(ann.label)}${ann.url ? ' <a href="' + escapeHtml(ann.url) + '" target="_blank" rel="noopener" style="color:#3b82f6;font-size:0.75rem">source</a>' : ''}</span>
+        <button class="ann-delete" data-id="${ann.id}" title="Delete annotation">&times;</button>
+      </li>`;
+    }
+    list.innerHTML = html;
+  }
+
+  // Set default date for annotation form
+  function setAnnotationFormDefaults() {
+    const dateInput = document.getElementById('ann-date');
+    if (dateInput && !dateInput.value) {
+      dateInput.value = new Date().toISOString().split('T')[0];
+    }
+  }
+
+  // Annotation form submit
+  document.getElementById('annotation-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const dateInput = document.getElementById('ann-date');
+    const labelInput = document.getElementById('ann-label');
+    const urlInput = document.getElementById('ann-url');
+
+    const body = {
+      event_date: dateInput.value,
+      label: labelInput.value.trim(),
+      competitor_name: trendsCompetitor,
+      url: urlInput.value.trim()
+    };
+
+    if (!body.event_date || !body.label) return;
+
+    try {
+      const res = await fetch('/api/annotations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) throw new Error('Failed to create annotation');
+      labelInput.value = '';
+      urlInput.value = '';
+      await loadTrends();
+    } catch (err) {
+      console.error('Add annotation error:', err);
+    }
+  });
+
+  // Annotation delete (delegated click handler)
+  document.getElementById('annotation-list').addEventListener('click', async (e) => {
+    const btn = e.target.closest('.ann-delete');
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const id = btn.getAttribute('data-id');
+    if (!id) return;
+    try {
+      const res = await fetch('/api/annotations/' + encodeURIComponent(id), { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete annotation');
+      await loadTrends();
+    } catch (err) {
+      console.error('Delete annotation error:', err);
+    }
+  });
+
+  // ============================================
+  // Posts View
+  // ============================================
+  async function populateFilters() {
+    try {
+      const [competitors, subreddits] = await Promise.all([
+        apiFetch('/api/competitors'),
+        apiFetch('/api/subreddits')
+      ]);
+
+      const compSelect = document.getElementById('filter-competitor');
+      competitors.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = c;
+        compSelect.appendChild(opt);
+      });
+
+      const subSelect = document.getElementById('filter-subreddit');
+      subreddits.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s;
+        opt.textContent = 'r/' + s;
+        subSelect.appendChild(opt);
+      });
+    } catch (err) {
+      // Silently ignore
+    }
+  }
+
+  async function showPosts(params) {
+    // Set filter values from URL params
+    if (params.competitor) {
+      document.getElementById('filter-competitor').value = params.competitor;
+    }
+    if (params.subreddit) {
+      document.getElementById('filter-subreddit').value = params.subreddit;
+    }
+    if (params.dimension) {
+      document.getElementById('filter-dimension').value = params.dimension;
+    }
+    if (params.sentiment) {
+      document.getElementById('filter-sentiment').value = params.sentiment;
+    }
+    document.getElementById('filter-theme').value = params.theme || '';
+
+    // Handle date param (from chart click) - set time range
+    if (params.date) {
+      // Convert date to since/until for that day
+      const dayStart = new Date(params.date + 'T00:00:00Z');
+      const dayEnd = new Date(params.date + 'T23:59:59Z');
+      params.since = Math.floor(dayStart.getTime() / 1000);
+      params.until = Math.floor(dayEnd.getTime() / 1000);
+    }
+
+    await loadPosts(params);
+    updateActiveFilters(params);
+  }
+
+  async function loadPosts(params) {
+    const container = document.getElementById('posts-content');
+    container.innerHTML = '<div class="loading">Loading posts...</div>';
+
+    try {
+      const query = new URLSearchParams();
+      if (params.competitor) query.set('competitor', params.competitor);
+      if (params.subreddit) query.set('subreddit', params.subreddit);
+      if (params.dimension && params.sentiment) {
+        query.set('dimension', params.dimension);
+        query.set('sentiment', params.sentiment);
+      }
+      if (params.since) query.set('since', params.since);
+      if (params.until) query.set('until', params.until);
+      if (params.theme) query.set('theme', params.theme);
+
+      const posts = await apiFetch('/api/posts?' + query.toString());
+      document.getElementById('posts-count-bar').textContent = `Showing ${posts.length} post${posts.length !== 1 ? 's' : ''}`;
+      renderPosts(posts);
+    } catch (err) {
+      container.innerHTML = '<div class="error-msg">Failed to load posts. Is the server running?</div>';
+      document.getElementById('posts-count-bar').textContent = '';
+    }
+  }
+
+  function renderPosts(posts) {
+    const container = document.getElementById('posts-content');
+    if (!posts || posts.length === 0) {
+      container.innerHTML = '<div class="empty-state"><p>No posts found</p><p class="sub">Try adjusting the filters or time range</p></div>';
+      return;
+    }
+
+    let html = '';
+    for (const post of posts) {
+      const body = truncateText(post.selftext, 300);
+      const competitors = post.competitors ? post.competitors.split(',') : [];
+      const sentimentHtml = renderPerCompetitorSentiment(post.competitor_sentiments || []);
+      const commentsHtml = renderComments(post.comments || [], post.id);
+      const hasComments = post.comments && post.comments.length > 0;
+
+      html += `
+        <div class="post-card">
+          <div class="post-card-header">
+            <a href="${escapeHtml(post.url)}" target="_blank" rel="noopener">${escapeHtml(post.title)}</a>
+          </div>
+          <div class="post-meta">
+            <span class="badge badge-subreddit">r/${escapeHtml(post.subreddit)}</span>
+            ${competitors.map(c => `<span class="badge badge-competitor">${escapeHtml(c.trim())}</span>`).join('')}
+            ${post.author ? `<span>by ${escapeHtml(post.author)}</span>` : ''}
+            <span>${post.score} points</span>
+            <span>${post.num_comments} comments</span>
+            <span>${post.posted_at}</span>
+          </div>
+          ${post.selftext ? `<div class="post-body" data-full="${escapeHtml(post.selftext)}" data-truncated="${body.truncated}">
+            <span class="body-text">${escapeHtml(body.text)}</span>
+            ${body.truncated ? '<button class="expand-btn" onclick="toggleExpand(this)">Show more</button>' : ''}
+          </div>` : ''}
+          ${sentimentHtml}
+          ${hasComments ? `<button class="comments-toggle" onclick="toggleComments(this, ${post.id})">Show ${post.comments.length} comment${post.comments.length !== 1 ? 's' : ''}</button>` : ''}
+          <div class="comments-section" id="comments-${post.id}">
+            ${commentsHtml}
+          </div>
+          <div class="post-footer">
+            <a href="${escapeHtml(post.url)}" target="_blank" rel="noopener">View on Reddit</a>
+          </div>
+        </div>`;
+    }
+    container.innerHTML = html;
+  }
+
+  function renderPerCompetitorSentiment(competitorSentiments) {
+    if (!competitorSentiments || competitorSentiments.length === 0) {
+      return '<div class="sentiment-tags"><span class="sentiment-tag tag-neutral">No competitor sentiment</span></div>';
+    }
+
+    let html = '';
+    for (const cs of competitorSentiments) {
+      const tags = [];
+      for (const dim of DIMENSIONS) {
+        const val = cs[dim];
+        if (val && val !== 'not_applicable') {
+          tags.push(`<span class="sentiment-tag tag-${val}">${dim}: ${val}</span>`);
+        }
+      }
+      for (const t of (cs.themes || [])) {
+        tags.push(`<span class="sentiment-tag tag-theme">${escapeHtml(THEME_LABELS[t] || t)}</span>`);
+      }
+      if (tags.length > 0) {
+        const inferred = cs.inferred ? ' <span class="inferred-note" title="Product not named; the judge inferred it from the thread and the comment being replied to">· inferred</span>' : '';
+        html += `<div class="competitor-sentiment-group">
+          <div class="comp-name">${escapeHtml(cs.competitor)}${inferred}</div>
+          <div class="sentiment-tags">${tags.join('')}</div>
+        </div>`;
+      }
+    }
+    return html || '<div class="sentiment-tags"></div>';
+  }
+
+  function renderComments(comments, postId) {
+    if (!comments || comments.length === 0) return '';
+
+    let html = '';
+    for (const comment of comments) {
+      const commentBody = truncateText(comment.body, 200);
+      const commentSentiment = renderPerCompetitorSentiment(comment.competitor_sentiments || []);
+
+      html += `<div class="comment-card">
+        <div class="comment-meta">
+          ${comment.author ? `<span>by ${escapeHtml(comment.author)}</span> &middot;` : ''}
+          <span>${comment.score} points</span> &middot;
+          <span>${comment.posted_at}</span>
+        </div>
+        <div class="comment-body">${escapeHtml(commentBody.text)}</div>
+        ${commentSentiment}
+      </div>`;
+    }
+    return html;
+  }
+
+  window.toggleComments = function(btn, postId) {
+    const section = document.getElementById('comments-' + postId);
+    if (section.classList.contains('open')) {
+      section.classList.remove('open');
+      btn.textContent = btn.textContent.replace('Hide', 'Show');
+    } else {
+      section.classList.add('open');
+      btn.textContent = btn.textContent.replace('Show', 'Hide');
+    }
+  };
+
+  // Toggle post text expand/collapse
+  window.toggleExpand = function(btn) {
+    const bodyDiv = btn.parentElement;
+    const isExpanded = bodyDiv.dataset.expanded === 'true';
+    const textSpan = bodyDiv.querySelector('.body-text');
+
+    if (isExpanded) {
+      const truncated = truncateText(bodyDiv.dataset.full, 300);
+      textSpan.textContent = truncated.text;
+      btn.textContent = 'Show more';
+      bodyDiv.dataset.expanded = 'false';
+    } else {
+      textSpan.textContent = bodyDiv.dataset.full;
+      btn.textContent = 'Show less';
+      bodyDiv.dataset.expanded = 'true';
+    }
+  };
+
+  function updateActiveFilters(params) {
+    const container = document.getElementById('active-filters');
+    let pills = '';
+
+    if (params.competitor) {
+      pills += `<span class="filter-pill">Competitor: ${escapeHtml(params.competitor)} <span class="remove" onclick="removeFilter('competitor')">&times;</span></span>`;
+    }
+    if (params.subreddit) {
+      pills += `<span class="filter-pill">r/${escapeHtml(params.subreddit)} <span class="remove" onclick="removeFilter('subreddit')">&times;</span></span>`;
+    }
+    if (params.dimension && params.sentiment) {
+      pills += `<span class="filter-pill">${escapeHtml(params.dimension)}: ${escapeHtml(params.sentiment)} <span class="remove" onclick="removeFilter('dimension')">&times;</span></span>`;
+    }
+    if (params.theme) {
+      pills += `<span class="filter-pill">Theme: ${escapeHtml(THEME_LABELS[params.theme] || params.theme)} <span class="remove" onclick="removeFilter('theme')">&times;</span></span>`;
+    }
+    if (params.date) {
+      pills += `<span class="filter-pill">Date: ${escapeHtml(params.date)} <span class="remove" onclick="removeFilter('date')">&times;</span></span>`;
+    }
+
+    container.innerHTML = pills;
+  }
+
+  window.removeFilter = function(key) {
+    if (key === 'competitor') document.getElementById('filter-competitor').value = '';
+    if (key === 'subreddit') document.getElementById('filter-subreddit').value = '';
+    if (key === 'theme') document.getElementById('filter-theme').value = '';
+    if (key === 'dimension') {
+      document.getElementById('filter-dimension').value = '';
+      document.getElementById('filter-sentiment').value = '';
+    }
+    applyPostFilters();
+  };
+
+  window.applyPostFilters = function() {
+    const params = {};
+    const comp = document.getElementById('filter-competitor').value;
+    const sub = document.getElementById('filter-subreddit').value;
+    const dim = document.getElementById('filter-dimension').value;
+    const sent = document.getElementById('filter-sentiment').value;
+    const theme = document.getElementById('filter-theme').value;
+
+    if (comp) params.competitor = comp;
+    if (theme) params.theme = theme;
+    if (sub) params.subreddit = sub;
+    if (dim && sent) {
+      params.dimension = dim;
+      params.sentiment = sent;
+    }
+
+    // Time range
+    const activeTimeBtn = document.querySelector('#posts-time-range button.active');
+    const range = activeTimeBtn ? parseInt(activeTimeBtn.dataset.range) : 0;
+    if (range > 0) {
+      params.since = sinceTimestamp(range);
+    }
+
+    navigateTo('posts', params);
+  };
+
+  // Posts time range control
+  document.getElementById('posts-time-range').addEventListener('click', (e) => {
+    if (e.target.tagName !== 'BUTTON') return;
+    document.querySelectorAll('#posts-time-range button').forEach(b => b.classList.remove('active'));
+    e.target.classList.add('active');
+    postsTimeRange = parseInt(e.target.dataset.range);
+  });
+
+  // ============================================
+  // Init
+  // ============================================
+  async function init() {
+    await loadConfig();
+    await populateFilters();
+    await loadStats();
+    route();
+  }
+
+  init();
+
+})();
+</script>
+
+</body>
+</html>

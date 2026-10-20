@@ -1,0 +1,103 @@
+# reddit-sentiment configuration — the single source for the pipeline AND the dashboard.
+#
+# The example tracks AI coding assistants. To point it at another market, change the
+# products, subreddits, relevance regex, aspects and themes below. Nothing else in the
+# code names a product.
+
+title: AI Coding Assistant Sentiment
+
+# Plain-English name for the category, used inside the judge's questions
+# ("Which <domain> is the author talking about?").
+domain: AI coding assistant
+
+# The product you care most about. The dashboard gives it the large "hero" card;
+# everything else is shown as a competitor.
+primary_product: GitHub Copilot
+
+# Canonical name + surface forms. Matching is case-insensitive on word boundaries.
+# Deliberately broad: finding a candidate is cheap, and the judge's "about" question
+# throws out false hits (a mouse "cursor", Microsoft's non-coding "Copilot").
+products:
+  - name: GitHub Copilot
+    aliases: [Copilot, GH Copilot, Copilot Chat]
+  - name: Cursor
+    aliases: [Cursor IDE, Cursor AI]
+  - name: Claude Code
+    aliases: [claude-code]
+  - name: Windsurf
+    aliases: [Codeium]
+  - name: OpenAI Codex
+    aliases: [Codex, Codex CLI]
+  - name: Cline
+    aliases: []
+
+# What the "which product?" check answers when a comment names none of the above.
+none_choice: >-
+  No specific product from this list: general chat AI used in a browser (ChatGPT,
+  Gemini, Claude.ai), a product not listed, or no product at all.
+
+subreddits: [ChatGPTCoding, cursor, ClaudeAI, ExperiencedDevs, webdev, programming]
+
+# Comments are only fetched for threads whose title/body matches this. Most threads in
+# a general programming subreddit never mention a tool, and comment fetching is the
+# slowest step. Python `re` syntax, matched case-insensitively.
+relevance_regex: '(?<![\w])(ai|llm|gpt|chatgpt|claude|copilot|cursor|codex|windsurf|codeium|cline|agent|agentic|autocomplete|vibe ?cod\w*|hallucinat\w*|code ?gen\w*|assistant)(?![\w])'
+
+# Five broad dimensions. Multi-label: a mention counts for each one the judge marks present.
+aspects:
+  usability: the product's ease of use, interface, workflow fit or learning curve
+  pricing: the product's cost, value for money, plan limits or licensing
+  accuracy: the quality or correctness of the code or answers it produces
+  reliability: the product's uptime, bugs, errors or speed
+  support: the vendor's customer service, documentation or how it treats customers
+
+# Finer "what people praise or complain about" labels. A FIXED list on purpose: the
+# judge classifies, it doesn't summarise, and a stable list keeps weeks comparable.
+themes:
+  code_quality:
+    label: Code quality
+    description: how good, idiomatic or maintainable the generated code is
+  hallucinated_apis:
+    label: Hallucinated APIs
+    description: invented functions, libraries, flags or APIs that don't exist
+  pricing_and_limits:
+    label: Pricing & limits
+    description: price, price changes, usage caps, rate limits or plan changes
+  speed_and_outages:
+    label: Speed & outages
+    description: slowness, downtime, errors or bugs in the tool itself
+  context_and_large_codebases:
+    label: Context & large codebases
+    description: how well it understands a whole repository, long files or project context
+  ide_and_workflow:
+    label: IDE & workflow
+    description: how it fits the editor, terminal, git, review or the team's workflow
+  privacy_and_security:
+    label: Privacy & security
+    description: code privacy, training on user code, secrets, licensing risk or insecure output
+  vs_general_chat_ai:
+    label: vs general chat AI
+    description: comparing it with pasting code into a general chat AI, or calling it a wrapper
+  vendor_conduct:
+    label: Vendor conduct
+    description: communication, support, onboarding or how the vendor treats customers
+
+thresholds:
+  about_min: 0.6     # judge must think the text is really about the product...
+  conf_min: 0.6      # ...and be this confident about the sentiment, or it doesn't count
+  label_min: 0.5     # an aspect/theme probability at or above this counts as present
+  target_min: 0.7    # "which product?" probability needed to create an inferred mention
+  min_n: 3           # fewer counted mentions than this -> no score shown
+
+collection:
+  post_window_days: 3       # rolling window of posts read each run
+  comment_delay_h: 24       # first comment pass
+  second_pass_h: 72         # second comment pass picks up late replies
+  max_comment_threads: 200  # per pass per run (>= 1 request each, ~1 s)
+  max_pages_per_thread: 5   # x 100 comments
+
+judge:
+  backend: jev                    # jev | claude (override with JUDGE_BACKEND)
+  jev_model: jev-1.13.0           # pinned: a silent bump would move calibrated thresholds
+  claude_model: claude-haiku-5-5  # override with CLAUDE_MODEL
+  workers: 6                      # concurrent requests

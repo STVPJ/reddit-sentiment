@@ -1,0 +1,17 @@
+[project]
+name = "reddit-sentiment"
+version = "1.0.0"
+description = "Per-product Reddit sentiment with typed, per-comment judgments and a dashboard"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+dependencies = ["anthropic>=1.15,<2", "httpx>=0.28,<1", "pyyaml>=6.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.setuptools]
+packages = ["sentiment", "sentiment.backends"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,32 @@
+# Live:  cp .env.example .env  (add a key), then  docker compose up -d
+# Demo:  make docker-demo   (synthetic data, no keys)
+services:
+  init:                      # creates the database schema once, then exits
+    build: .
+    command: ["python", "-m", "sentiment", "init-db"]
+    volumes: ["./data:/data"]
+
+  pipeline:                  # daily run; failed rows retry on the next run
+    build: .
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATA_DIR: /data
+    volumes: ["./data:/data"]
+    command: ["sh", "-c", "while true; do python -m sentiment run; sleep 86400; done"]
+    depends_on:
+      init: { condition: service_completed_successfully }
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: dashboard/Dockerfile
+    environment:
+      DATA_DIR: /data
+    volumes: ["./data:/data"]
+    ports: ["127.0.0.1:3852:3852"]   # this machine only; widen deliberately
+    depends_on:
+      init: { condition: service_completed_successfully }
+    restart: unless-stopped

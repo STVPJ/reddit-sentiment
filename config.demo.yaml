@@ -1,0 +1,21 @@
+# Demo overlay: fictional products for `make demo` / `python -m sentiment seed-demo`.
+# Everything not set here (subreddits, aspects, themes, thresholds) comes from config.yaml.
+# These names are invented and don't refer to any real tool.
+extends: config.yaml
+
+title: AI Coding Assistant Sentiment (demo)
+primary_product: Codewren
+
+products:
+  - name: Codewren
+    aliases: [Wren]
+  - name: Stackhound
+    aliases: []
+  - name: Patchwise
+    aliases: []
+  - name: Lumen Pair
+    aliases: [LumenPair]
+  - name: Ferrocode
+    aliases: []
+  - name: Tinbox Assist
+    aliases: [Tinbox]

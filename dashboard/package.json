@@ -1,0 +1,20 @@
+{
+  "name": "reddit-sentiment-dashboard",
+  "version": "1.0.0",
+  "description": "Dashboard for per-product Reddit sentiment: trends, themes and drill-down to comments",
+  "private": true,
+  "license": "MIT",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.4.1",
+    "express": "^5.1.0",
+    "yaml": "^2.8.1"
+  }
+}
